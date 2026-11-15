@@ -58,13 +58,17 @@ const BADGE_COLOR = {
 
 const fit = (text, max) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
 
-/** The ids of the senders chosen in the settings, null for all. */
+/**
+ * The ids of the senders chosen in the settings, null for all. A choice that
+ * names no known sender (the rules device, a forgotten sender) shows nothing,
+ * never everything.
+ */
 function chosenIds(hub, settings) {
-  const chosen = [settings?.sources ?? []]
-    .flat()
-    .map((id) => parseSourceDeviceId(hub.gladys, id, hub.sources))
-    .filter(Boolean);
-  return chosen.length ? new Set(chosen) : null;
+  const raw = [settings?.sources ?? []].flat().filter((id) => typeof id === 'string' && id);
+  if (raw.length === 0) {
+    return null;
+  }
+  return new Set(raw.map((id) => parseSourceDeviceId(hub.gladys, id, hub.sources)).filter(Boolean));
 }
 
 async function get(hub, { settings = {}, language = 'en' }) {

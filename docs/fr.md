@@ -41,8 +41,7 @@ la section « Envoyez vos journaux à Gladys ».
 
 Dans les réglages syslog (ou « journalisation distante ») de chaque appareil,
 indiquez l'adresse de la machine Gladys et le port UDP affiché par l'écran de
-configuration. L'UDP est ce que presque tous les appareils proposent ; le TCP
-(le second port) ne perd pas de messages et convient à rsyslog et syslog-ng. Les
+configuration. L'UDP est ce que presque tous les appareils proposent ; le TCP (le second port) ne perd pas de messages en route et convient à rsyslog et syslog-ng. Les
 deux découpages TCP, « octet counting » et « un message par ligne », sont
 compris.
 
@@ -100,8 +99,7 @@ avec leur prochain message.
 ## Configuration
 
 - **Émetteurs autorisés** : adresses IP ou plages IPv4 (`192.168.1.0/24`),
-  séparées par des virgules. Vide : tout émetteur est accepté. Un message d'une
-  autre adresse est ignoré par le récepteur.
+  séparées par des virgules. Vide : tout émetteur est accepté. Un message d'une autre adresse est ignoré par le récepteur. Conseillé : syslog n'a pas d'authentification, et un hôte du réseau pourrait sinon remplir les 200 émetteurs d'adresses usurpées.
 - **Relais de confiance** : voir plus haut.
 - **Messages par seconde par émetteur** (20 par défaut) : au-delà, les messages
   de cet émetteur sont ignorés (une rafale du double est acceptée). Un appareil

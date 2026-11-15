@@ -251,9 +251,10 @@ code de ce dépôt. Compléter ce fichier quand un nouveau piège est découvert
 - Budgets : états toutes les 15 s, seulement les changements (dédoublonnage maison + heartbeat 12 h), 60 au plus
   par tour (300/min au cœur) ; événements de scène : recharge de 10 s par (règle, émetteur) ou (émetteur,
   sévérité), 120/min. Récepteur : 20 msg/s par émetteur (rafale ×2, réglable), 500 msg/s au total, trames TCP de
-  8 Ko, 64 connexions TCP, tampon de 500 messages, 200 émetteurs.
+  8 Ko (une trame « octet counting » doit commencer par `<`, sinon c'est une ligne), 64 connexions TCP dont 8 par IP (60 s pour envoyer un premier octet), tampon de 500 messages, 200 émetteurs.
 - La réponse d'une action (`onAction`) est l'objet `{ en, fr, de, es }` lui-même : le SDK l'enveloppe dans
   `{ message }` (le renvoyer déjà enveloppé donne `message.message`).
+- Analyse : jamais de quantificateur d'espaces autour d'une classe dans une regex appliquée au message (`/ *[…]+ */` était quadratique : 4,6 s pour 60 000 espaces) ; texte tronqué avant nettoyage, champs bornés à 48.
 - Allemand : le test de politesse attrape aussi un « Sie » en début de phrase qui veut dire « ils » : tourner
   autrement (« Deren Meldungen… », « Diese… »).
 

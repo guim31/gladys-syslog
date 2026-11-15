@@ -30,7 +30,11 @@ export const LINK_PORT = 5515;
 export const DEFAULT_RATE = 20;
 
 const MAX_TCP_CLIENTS = 64;
+// One sender cannot take every TCP slot.
+const MAX_TCP_CLIENTS_PER_IP = 8;
 const TCP_IDLE_MS = 10 * 60 * 1000;
+// A connection that has sent nothing yet is closed sooner.
+const TCP_SILENT_MS = 60 * 1000;
 // Beyond this many bytes waiting on the link, messages are dropped rather than
 // queued: the main container is not keeping up.
 const LINK_HIGH_WATER = 1024 * 1024;
@@ -61,6 +65,11 @@ export class Receiver {
     this.stats = { refused: {}, limited: {}, oversized: 0, dropped: 0 };
   }
 
+  get statsEmpty() {
+    const { refused, limited, oversized, dropped } = this.stats;
+    return !Object.keys(refused).length && !Object.keys(limited).length && !oversized && !dropped;
+  }
+
   async start() {
     const { syslogPort, linkPort, host } = this.options;
     this.udp = dgram.createSocket({ type: 'udp4', recvBufferSize: 1 << 20 });
@@ -78,6 +87,10 @@ export class Receiver {
     await listen(this.tcp, syslogPort, host);
     this.linkServer = net.createServer((socket) => this.acceptLink(socket));
     await listen(this.linkServer, linkPort, host);
+    // An accept error (EMFILE…) must not crash the receiver.
+    for (const server of [this.tcp, this.linkServer]) {
+      server.on('error', (err) => logger.error(`TCP server error: ${err.message}`));
+    }
 
     this.statsTimer = setInterval(() => this.sendStats(), STATS_MS);
     this.statsTimer.unref();
@@ -120,8 +133,15 @@ export class Receiver {
       socket.destroy();
       return;
     }
+    const fromIp = [...this.tcpClients].filter((client) => client.syslogIp === ip).length;
+    if (fromIp >= MAX_TCP_CLIENTS_PER_IP) {
+      socket.destroy();
+      return;
+    }
+    socket.syslogIp = ip;
     this.tcpClients.add(socket);
-    socket.setTimeout(TCP_IDLE_MS, () => socket.destroy());
+    socket.setTimeout(TCP_SILENT_MS, () => socket.destroy());
+    socket.once('data', () => socket.setTimeout(TCP_IDLE_MS));
     const framer = new TcpFramer((frame) => this.receive(frame, ip), {
       onOversized: () => {
         this.stats.oversized += 1;
@@ -175,14 +195,14 @@ export class Receiver {
     }
   }
 
+  /** Every 10 s when something happened, and once more after: the end of a problem. */
   sendStats() {
-    const { refused, limited, oversized, dropped } = this.stats;
-    const empty =
-      !Object.keys(refused).length && !Object.keys(limited).length && !oversized && !dropped;
-    if (empty || !this.link || this.link.destroyed) {
+    const empty = this.statsEmpty;
+    if ((empty && !this.statsSent) || !this.link || this.link.destroyed) {
       return;
     }
     this.link.write(`${JSON.stringify({ type: 'stats', ...this.stats })}\n`);
+    this.statsSent = !empty;
     this.resetStats();
   }
 
@@ -195,6 +215,7 @@ export class Receiver {
     this.link = socket;
     logger.info('Main container connected');
     socket.setNoDelay(true);
+    socket.setKeepAlive(true, 30_000);
     socket.on('error', () => {});
     let pending = '';
     socket.on('data', (chunk) => {

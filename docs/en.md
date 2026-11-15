@@ -40,7 +40,7 @@ one for TCP: the configuration screen of the integration shows them, in the
 
 In the syslog (or "remote logging") settings of each device, enter the address
 of the Gladys machine and the UDP port shown by the configuration screen. UDP is
-what almost every device offers; TCP (the second port) does not lose messages
+what almost every device offers; TCP (the second port) does not lose messages in transit
 and suits rsyslog and syslog-ng. Both "octet counting" and "one message per
 line" TCP framings are understood.
 
@@ -97,8 +97,7 @@ message.
 ## Configuration
 
 - **Allowed senders**: IP addresses or IPv4 ranges (`192.168.1.0/24`),
-  separated by commas. Empty: every sender is accepted. A message from another
-  address is dropped by the receiver.
+  separated by commas. Empty: every sender is accepted. A message from another address is dropped by the receiver. Recommended: syslog has no authentication, and a host of the network could otherwise fill the 200 senders with forged addresses.
 - **Trusted relays**: see above.
 - **Messages per second per sender** (20 by default): beyond, the messages of
   that sender are dropped (a burst of twice this number is accepted). A device

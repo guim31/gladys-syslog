@@ -3,7 +3,8 @@
 // (`<length> <message>`, rsyslog with `TCP_Framing="octet-counted"`, RFC 5425)
 // or "non-transparent framing" (one message per line, ended by LF — or NUL,
 // sent by some appliances). Both are detected per frame: an octet-counted
-// frame starts with a digit, a message starts with `<`.
+// frame starts with a digit and its message with `<`; anything else is a line
+// (`404 not found` is a line, not a 404-byte frame).
 //
 // A frame longer than `maxFrame` is skipped up to its end, never buffered: a
 // sender cannot make the receiver hold more than `maxFrame` bytes per socket.
@@ -78,6 +79,13 @@ export class TcpFramer {
     }
     const length = Number(header.toString('latin1'));
     const start = space + 1;
+    if (this.buffer.length <= start) {
+      return false;
+    }
+    // A syslog message starts with its priority: no `<`, no octet counting.
+    if (this.buffer[start] !== 0x3c || length === 0) {
+      return this.line();
+    }
     if (length > this.maxFrame) {
       this.onOversized();
       this.buffer = this.buffer.subarray(start);

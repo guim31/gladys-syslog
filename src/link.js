@@ -32,6 +32,9 @@ export class ReceiverLink extends EventEmitter {
   }
 
   start() {
+    if (!this.stopped) {
+      return;
+    }
     this.stopped = false;
     this.connect();
   }
@@ -62,6 +65,7 @@ export class ReceiverLink extends EventEmitter {
     this.socket = socket;
     let pending = '';
     socket.setEncoding('utf8');
+    socket.setKeepAlive(true, 30_000);
     socket.on('connect', () => {
       this.connected = true;
       this.failures = 0;

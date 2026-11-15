@@ -51,9 +51,19 @@ const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\S* /;
 const HOSTNAME = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,253})$|^[0-9a-fA-F:]{2,39}$/;
 const TAG = /^([^\s:[\]]{1,48})(?:\[([^\]\s]{1,32})\])?: ?/;
 
-/** Control characters (line breaks included) become spaces. */
+/**
+ * Control characters (line breaks included) become spaces, runs of spaces one
+ * space. Two linear passes: a pattern with a space quantifier around the class
+ * backtracks quadratically on a long run of spaces (a hostile datagram).
+ */
 // eslint-disable-next-line no-control-regex
-const clean = (text) => text.replace(/ *[\u0000-\u001f\u007f]+ */g, ' ').trim();
+const CONTROL = /[\u0000-\u001f\u007f]+/g;
+const clean = (text) => text.replace(CONTROL, ' ').replace(/ {2,}/g, ' ').trim();
+
+// Longest program name, process id and message id kept.
+const MAX_FIELD = 48;
+const field = (value) =>
+  value ? clean(value.slice(0, MAX_FIELD * 2)).slice(0, MAX_FIELD) || null : null;
 
 const nil = (value) => (value === undefined || value === '-' || value === '' ? null : value);
 
@@ -158,7 +168,8 @@ export function parseMessage(raw, { ip, receivedAt }) {
     line = line.slice(priMatch[0].length);
   }
   const parsed = parse5424(line) ?? parse3164(line);
-  const text = clean(parsed.text).slice(0, MAX_TEXT);
+  // Bounded before cleaning: a datagram can be 64 KB.
+  const text = clean(parsed.text.slice(0, MAX_TEXT * 2)).slice(0, MAX_TEXT);
   return {
     ip,
     receivedAt,
@@ -166,9 +177,9 @@ export function parseMessage(raw, { ip, receivedAt }) {
     severity: pri & 7,
     format: parsed.format,
     hostname: parsed.hostname,
-    app: parsed.app ? clean(parsed.app).slice(0, 48) : null,
-    procId: parsed.procId,
-    msgId: parsed.msgId,
+    app: field(parsed.app),
+    procId: field(parsed.procId),
+    msgId: field(parsed.msgId),
     text: text || '-',
   };
 }

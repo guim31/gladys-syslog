@@ -41,8 +41,7 @@ zeigt sie im Abschnitt „Schicke deine Protokolle an Gladys“.
 
 Trage in den Syslog-Einstellungen (oder „Remote-Protokollierung“) jedes Geräts
 die Adresse des Gladys-Rechners und den UDP-Port ein, den der
-Konfigurationsbildschirm zeigt. UDP bietet fast jedes Gerät an; TCP (der zweite
-Port) verliert keine Meldungen und passt zu rsyslog und syslog-ng. Beide
+Konfigurationsbildschirm zeigt. UDP bietet fast jedes Gerät an; TCP (der zweite Port) verliert unterwegs keine Meldungen und passt zu rsyslog und syslog-ng. Beide
 TCP-Aufteilungen, „Octet Counting“ und „eine Meldung pro Zeile“, werden
 verstanden.
 
@@ -102,8 +101,7 @@ kommen mit ihrer nächsten Meldung zurück.
 ## Konfiguration
 
 - **Erlaubte Absender**: IP-Adressen oder IPv4-Bereiche (`192.168.1.0/24`),
-  durch Kommas getrennt. Leer: Jeder Absender wird angenommen. Eine Meldung von
-  einer anderen Adresse verwirft der Empfänger.
+  durch Kommas getrennt. Leer: Jeder Absender wird angenommen. Eine Meldung von einer anderen Adresse verwirft der Empfänger. Empfohlen: Syslog hat keine Authentifizierung, und ein Rechner im Netzwerk könnte sonst die 200 Absender mit gefälschten Adressen füllen.
 - **Vertrauenswürdige Relays**: siehe oben.
 - **Meldungen pro Sekunde je Absender** (standardmäßig 20): Darüber werden die
   Meldungen dieses Absenders verworfen (ein Schub der doppelten Menge wird

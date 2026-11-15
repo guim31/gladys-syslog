@@ -40,8 +40,7 @@ TCP: la pantalla de configuración de la integración los muestra, en la secció
 
 En los ajustes syslog (o «registro remoto») de cada equipo, indique la dirección
 de la máquina de Gladys y el puerto UDP que muestra la pantalla de
-configuración. UDP es lo que ofrecen casi todos los equipos; TCP (el segundo
-puerto) no pierde mensajes y conviene a rsyslog y syslog-ng. Se entienden las
+configuración. UDP es lo que ofrecen casi todos los equipos; TCP (el segundo puerto) no pierde mensajes por el camino y conviene a rsyslog y syslog-ng. Se entienden las
 dos divisiones TCP, «octet counting» y «un mensaje por línea».
 
 En un servidor Linux con rsyslog, basta una línea en
@@ -96,8 +95,7 @@ pestaña Descubrir de los equipos que no añadió; vuelven con su próximo mensa
 ## Configuración
 
 - **Emisores permitidos**: direcciones IP o rangos IPv4 (`192.168.1.0/24`),
-  separados por comas. Vacío: se acepta cualquier emisor. El receptor descarta
-  un mensaje de otra dirección.
+  separados por comas. Vacío: se acepta cualquier emisor. El receptor descarta un mensaje de otra dirección. Recomendado: syslog no tiene autenticación, y de lo contrario un equipo de la red podría llenar los 200 emisores con direcciones falsificadas.
 - **Relés de confianza**: vea más arriba.
 - **Mensajes por segundo por emisor** (20 por defecto): por encima, los mensajes
   de ese emisor se descartan (se acepta una ráfaga del doble). Un equipo

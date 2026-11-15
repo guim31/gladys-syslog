@@ -94,6 +94,29 @@ test('states of the added senders: published once, then only what changed', asyn
   assert.equal(await world.hub.flush(), 4);
 });
 
+test('messages replayed after a restart keep their reception time', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  world.receive('<11>old error', NAS);
+  world.receive('<14>recent', ROUTER);
+  // Received 2 hours ago by the receiver, replayed now.
+  world.clock.now += 2 * 3600_000;
+  world.link.emit('message', {
+    type: 'message',
+    ip: '198.51.100.9',
+    receivedAt: world.clock.now - 2 * 3600_000,
+    severity: 3,
+    facility: 'user',
+    format: 'rfc3164',
+    hostname: null,
+    app: null,
+    text: 'replayed error',
+  });
+  const replayed = world.hub.sources.get('198.51.100.9');
+  assert.equal(replayed.errors.count(world.clock.now), 0, 'not an error of the last hour');
+  assert.equal(replayed.lastSeen, T0);
+});
+
 test('onDeviceCreated sends every state again', async (t) => {
   const world = await createWorld();
   t.after(() => world.app.stop());

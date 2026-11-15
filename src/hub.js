@@ -72,6 +72,10 @@ export class HourWindow {
   add(now) {
     const minute = Math.floor(now / 60_000);
     this.buckets.set(minute, (this.buckets.get(minute) ?? 0) + 1);
+    // Pruned here too: count() only runs for the devices added to Gladys.
+    if (this.buckets.size > 60) {
+      this.count(now);
+    }
   }
 
   count(now) {
@@ -209,6 +213,7 @@ export class SyslogHub {
   async stop() {
     clearInterval(this.flushTimer);
     clearTimeout(this.discoveryTimer);
+    clearTimeout(this.widgetTimer);
     this.link.stop();
     this.save();
     await this.store.flush();
@@ -306,7 +311,10 @@ export class SyslogHub {
     if (!this.allow.test(message.ip)) {
       return;
     }
+    // The reception time: messages replayed from the receiver's buffer after a
+    // restart keep their own time (bounded by the clock of the hub).
     const now = this.now();
+    const at = Number.isFinite(message.receivedAt) ? Math.min(message.receivedAt, now) : now;
     const id = this.sourceIdOf(message);
     let source = this.sources.get(id);
     if (!source) {
@@ -318,8 +326,8 @@ export class SyslogHub {
         id,
         ip: message.ip,
         hostname: message.hostname,
-        firstSeen: now,
-        lastSeen: now,
+        firstSeen: at,
+        lastSeen: at,
         last: null,
         errors: new HourWindow(),
       };
@@ -331,16 +339,21 @@ export class SyslogHub {
         source: message.hostname ?? message.ip,
         ip: message.ip,
       });
-    } else if (message.hostname && message.hostname !== source.hostname) {
+    } else if (
+      message.hostname &&
+      message.hostname !== source.hostname &&
+      !this.createdDevice(sourceIds(this.gladys, id).device)
+    ) {
+      // Only the name proposed in Discovery: once added, Gladys owns the name.
       source.hostname = message.hostname;
       this.save();
       this.scheduleDiscovery();
     }
     source.ip = message.ip;
-    source.lastSeen = now;
+    source.lastSeen = Math.max(source.lastSeen, at);
     source.last = message;
     if (message.severity <= ERROR_MAX) {
-      source.errors.add(now);
+      source.errors.add(at);
     }
     logger.debug(`${message.ip} ${SEVERITIES[message.severity]} ${matchLine(message)}`);
 
@@ -355,7 +368,7 @@ export class SyslogHub {
     });
 
     if (message.severity <= SEVERE_MAX) {
-      this.recent.unshift({ ...message, sourceId: id, receivedAt: now });
+      this.recent.unshift({ ...message, sourceId: id, receivedAt: at });
       this.recent.length = Math.min(this.recent.length, RECENT_SIZE);
       this.fire(TRIGGERS.SEVERE_MESSAGE, `severe:${id}:${message.severity}`, {
         ...common(),
@@ -367,7 +380,7 @@ export class SyslogHub {
     const names = this.namesOf(source);
     for (const rule of this.config.rules) {
       if (ruleMatches(rule, message, names)) {
-        this.ruleWindows.get(rule.slot)?.add(now);
+        this.ruleWindows.get(rule.slot)?.add(at);
         this.fire(TRIGGERS.RULE_MATCHED, `rule:${rule.slot}:${id}`, {
           ...common(),
           rule: ruleKey(rule.slot),
@@ -440,9 +453,20 @@ export class SyslogHub {
 
   refreshWidget(force = false) {
     const now = this.now();
-    if (!force && now - this.lastWidgetRefresh < this.timings.widgetRefreshMs) {
+    const wait = this.lastWidgetRefresh + this.timings.widgetRefreshMs - now;
+    if (!force && wait > 0) {
+      // Throttled: one trailing refresh, so a burst does not leave the widget stale.
+      if (this.timers && !this.widgetTimer) {
+        this.widgetTimer = setTimeout(() => {
+          this.widgetTimer = null;
+          this.refreshWidget(true);
+        }, wait);
+        this.widgetTimer.unref?.();
+      }
       return;
     }
+    clearTimeout(this.widgetTimer);
+    this.widgetTimer = null;
     this.lastWidgetRefresh = now;
     try {
       this.gladys.requestWidgetRefresh(WIDGET_KEY);
@@ -485,8 +509,14 @@ export class SyslogHub {
       this.discoveryDue = true;
       return;
     }
-    clearTimeout(this.discoveryTimer);
-    this.discoveryTimer = setTimeout(() => this.publishDiscovery(), this.timings.discoveryDelayMs);
+    // Armed once, not pushed back: a stream of changes still publishes.
+    if (this.discoveryTimer) {
+      return;
+    }
+    this.discoveryTimer = setTimeout(() => {
+      this.discoveryTimer = null;
+      this.publishDiscovery();
+    }, this.timings.discoveryDelayMs);
     this.discoveryTimer.unref?.();
   }
 

@@ -57,7 +57,7 @@ test('an oversized frame is skipped, the next one kept', () => {
     maxFrame: 32,
     onOversized: () => (oversized += 1),
   });
-  framer.push(Buffer.from(`100 ${'x'.repeat(100)}<13>ok\n`));
+  framer.push(Buffer.from(`100 <13>${'x'.repeat(96)}<13>ok\n`));
   framer.push(Buffer.from(`<13>${'y'.repeat(50)}`));
   framer.push(Buffer.from(`${'y'.repeat(50)}\n<13>after\n`));
   assert.deepEqual(frames, ['<13>ok', '<13>after']);
@@ -67,8 +67,20 @@ test('an oversized frame is skipped, the next one kept', () => {
 test('a line starting with a digit is not taken for a length', () => {
   const frames = [];
   const framer = new TcpFramer((frame) => frames.push(frame.toString()));
-  framer.push(Buffer.from('2026-11-15 plain line\n'));
-  assert.deepEqual(frames, ['2026-11-15 plain line']);
+  framer.push(Buffer.from('2026-11-15 plain line\n404 not found\n<13>next\n'));
+  assert.deepEqual(frames, ['2026-11-15 plain line', '404 not found', '<13>next']);
+});
+
+test('hostile input: long runs of spaces parse in linear time, every field is bounded', () => {
+  const started = performance.now();
+  const parsed = parseMessage(`<13>host app: a${' '.repeat(60_000)}x`, origin);
+  assert.ok(performance.now() - started < 50, 'no catastrophic backtracking');
+  assert.equal(parsed.text, 'host app: a', 'no timestamp: the whole line is the text');
+  const long = parseMessage(
+    `<13>1 - host ${'a'.repeat(9000)} ${'p'.repeat(60_000)} ${'m'.repeat(9000)} - x`,
+    origin,
+  );
+  assert.ok(long.app.length <= 48 && long.procId.length <= 48 && long.msgId.length <= 48);
 });
 
 test('allowed senders: addresses, IPv4 ranges, IPv6, mapped IPv4, invalid entries', () => {
