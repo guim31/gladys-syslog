@@ -1,8 +1,8 @@
 {
-  "name": "gladys-integration-template-js",
+  "name": "gladys-syslog",
   "version": "1.0.0",
   "private": true,
-  "description": "Official starter template to build an external integration for Gladys Assistant with the JavaScript SDK.",
+  "description": "Syslog receiver for Gladys Assistant: devices send their logs, Gladys reacts to the messages that matter.",
   "type": "module",
   "main": "index.js",
   "scripts": {

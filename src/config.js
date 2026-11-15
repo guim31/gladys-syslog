@@ -1,45 +1,75 @@
 // -----------------------------------------------------------------------------
-// Integration configuration.
+// Integration configuration: defaults (they mirror the `default` values of the
+// manifest `config_schema`, see test/manifest.test.js) and normalization, so
+// the rest of the code never deals with strings, blanks or `undefined`.
 //
-// The configuration is filled in by the user in Gladys, from the `config_schema`
-// declared in `gladys-assistant-integration.json`. The SDK fetches it for you
-// (`gladys.getConfig()`) and notifies you of every change through
-// `gladys.onConfigUpdated()`.
-//
-// This module only provides defaults and normalizes the received object, so the
-// rest of the code never has to deal with `undefined`.
+// The receiver settings (allowed sources, rate limit), the language of the
+// texts, and five rule slots: name, pattern, minimum severity, sources.
 // -----------------------------------------------------------------------------
 
-// Defaults: they MUST stay consistent with the `default` values declared in the
-// `config_schema` of the manifest.
+import { SEVERITY } from './syslog/parse.js';
+import { compileRule } from './rules.js';
+
+export const LANGUAGES = ['en', 'fr', 'de', 'es'];
+export const RULE_SLOTS = [1, 2, 3, 4, 5];
+// "At least as severe as", in the select of each rule; `any` matches debug too.
+export const RULE_SEVERITIES = ['any', 'notice', 'warning', 'err', 'crit', 'alert', 'emerg'];
+
+export const DEFAULT_RATE = 20;
+export const MIN_RATE = 1;
+export const MAX_RATE = 500;
+
 export const DEFAULT_CONFIG = {
-  latitude: 48.8566, // Paris
-  longitude: 2.3522,
-  unit: 'celsius', // 'celsius' | 'fahrenheit'
-  // Seconds between two reads of the polled sensors. Gladys polls at most once
-  // a minute: slower intervals are applied by skipping polls (see
-  // createPoller in src/devices/index.js).
-  poll_frequency: 300,
-  // Reserved key (NOT in config_schema): because the manifest declares both
-  // 'local' and 'cloud' in its `transports` field, Gladys shows a standard
-  // "Prefer the local connection" toggle and sends the user's choice here.
-  // Read-only for the integration; defaults to true.
-  GLADYS_PREFER_LOCAL: true,
+  allowed_sources: '',
+  relays: '',
+  rate_limit: DEFAULT_RATE,
+  language: 'fr',
+  ...Object.fromEntries(
+    RULE_SLOTS.flatMap((n) => [
+      [`rule_${n}_name`, ''],
+      [`rule_${n}_pattern`, ''],
+      [`rule_${n}_severity`, 'any'],
+      [`rule_${n}_sources`, ''],
+    ]),
+  ),
 };
 
 /**
- * Merge the user config with the defaults.
- * @param {Record<string, unknown>} raw config returned by the SDK
+ * @param {Record<string, unknown>} raw the configuration returned by the SDK
  */
 export function normalizeConfig(raw = {}) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const text = (key) => (typeof source[key] === 'string' ? source[key].trim() : '');
+  const rate = Number(source.rate_limit);
+  const rules = [];
+  const invalidRules = [];
+  for (const n of RULE_SLOTS) {
+    const pattern = text(`rule_${n}_pattern`);
+    if (!pattern) {
+      continue;
+    }
+    const severity = RULE_SEVERITIES.includes(source[`rule_${n}_severity`])
+      ? source[`rule_${n}_severity`]
+      : 'any';
+    const rule = compileRule({
+      slot: n,
+      name: text(`rule_${n}_name`).slice(0, 40),
+      pattern,
+      maxSeverity: severity === 'any' ? SEVERITY.debug : SEVERITY[severity],
+      sources: text(`rule_${n}_sources`),
+    });
+    if (rule) {
+      rules.push(rule);
+    } else {
+      invalidRules.push(n);
+    }
+  }
   return {
-    ...DEFAULT_CONFIG,
-    ...raw,
-    // Force the types: config may arrive as strings from a form.
-    latitude: Number(raw.latitude ?? DEFAULT_CONFIG.latitude),
-    longitude: Number(raw.longitude ?? DEFAULT_CONFIG.longitude),
-    poll_frequency: Number(raw.poll_frequency ?? DEFAULT_CONFIG.poll_frequency),
-    // The preference is a boolean; anything but an explicit false means true.
-    GLADYS_PREFER_LOCAL: raw.GLADYS_PREFER_LOCAL !== false,
+    allowedSources: text('allowed_sources'),
+    relays: text('relays'),
+    rate: Number.isInteger(rate) && rate >= MIN_RATE && rate <= MAX_RATE ? rate : DEFAULT_RATE,
+    language: LANGUAGES.includes(source.language) ? source.language : DEFAULT_CONFIG.language,
+    rules,
+    invalidRules,
   };
 }

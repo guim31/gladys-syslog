@@ -1,0 +1,136 @@
+{
+  "_comment": "Syslog lines in the formats of real senders (anonymized: addresses in 192.0.2.0/24, invented host names and serials). Each entry: the raw line and what the parser must read.",
+  "messages": [
+    {
+      "sender": "rsyslog, RFC 5424 template (RSYSLOG_SyslogProtocol23Format)",
+      "raw": "<86>1 2026-11-15T12:00:00.123456+01:00 nas-01 sshd 2412 - - Accepted publickey for admin from 192.0.2.50 port 51234 ssh2",
+      "expect": {
+        "format": "rfc5424",
+        "facility": "authpriv",
+        "severity": 6,
+        "hostname": "nas-01",
+        "app": "sshd",
+        "procId": "2412",
+        "text": "Accepted publickey for admin from 192.0.2.50 port 51234 ssh2"
+      }
+    },
+    {
+      "sender": "RFC 5424 with structured data and BOM (RFC 5424 §6.5 example 3)",
+      "raw": "<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"] ﻿An application event log entry...",
+      "expect": {
+        "format": "rfc5424",
+        "facility": "local4",
+        "severity": 5,
+        "hostname": "mymachine.example.com",
+        "app": "evntslog",
+        "msgId": "ID47",
+        "text": "An application event log entry..."
+      }
+    },
+    {
+      "sender": "RFC 5424 with an escaped bracket in the structured data, no message",
+      "raw": "<14>1 2026-11-15T12:00:00Z host app - - [meta x=\"a\\]b\"]",
+      "expect": {
+        "format": "rfc5424",
+        "severity": 6,
+        "hostname": "host",
+        "app": "app",
+        "text": "-"
+      }
+    },
+    {
+      "sender": "RFC 3164 example (RFC 3164 §5.4)",
+      "raw": "<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8",
+      "expect": {
+        "format": "rfc3164",
+        "facility": "auth",
+        "severity": 2,
+        "hostname": "mymachine",
+        "app": "su",
+        "text": "'su root' failed for lonvick on /dev/pts/8"
+      }
+    },
+    {
+      "sender": "OpenWrt logd (no host name)",
+      "raw": "<30>Nov 15 12:00:01 dnsmasq-dhcp[1784]: DHCPACK(br-lan) 192.0.2.23 02:00:5e:10:00:01 phone",
+      "expect": {
+        "format": "rfc3164",
+        "facility": "daemon",
+        "severity": 6,
+        "hostname": null,
+        "app": "dnsmasq-dhcp",
+        "procId": "1784",
+        "text": "DHCPACK(br-lan) 192.0.2.23 02:00:5e:10:00:01 phone"
+      }
+    },
+    {
+      "sender": "Linux kernel via rsyslog legacy forwarding, space-padded day",
+      "raw": "<3>Nov  5 03:12:44 backup-srv kernel: [12345.678901] ata2.00: failed command: READ FPDMA QUEUED",
+      "expect": {
+        "format": "rfc3164",
+        "facility": "kern",
+        "severity": 3,
+        "hostname": "backup-srv",
+        "app": "kernel",
+        "text": "[12345.678901] ata2.00: failed command: READ FPDMA QUEUED"
+      }
+    },
+    {
+      "sender": "NUT upsmon",
+      "raw": "<161>Nov 15 12:00:02 nas-01 upsmon[912]: UPS ups@localhost on battery",
+      "expect": {
+        "format": "rfc3164",
+        "facility": "local4",
+        "severity": 1,
+        "hostname": "nas-01",
+        "app": "upsmon",
+        "text": "UPS ups@localhost on battery"
+      }
+    },
+    {
+      "sender": "ISO timestamp (rsyslog RSYSLOG_ForwardFormat)",
+      "raw": "<29>2026-11-15T12:00:03.000+01:00 vpn-gw openvpn[3311]: client-a/192.0.2.77:50123 Peer Connection Initiated with [AF_INET]192.0.2.77:50123",
+      "expect": {
+        "format": "rfc3164",
+        "severity": 5,
+        "hostname": "vpn-gw",
+        "app": "openvpn",
+        "text": "client-a/192.0.2.77:50123 Peer Connection Initiated with [AF_INET]192.0.2.77:50123"
+      }
+    },
+    {
+      "sender": "Appliance sending key=value without tag (firewall style)",
+      "raw": "<189>date=2026-11-15 time=12:00:04 devname=\"FW-01\" logid=\"0100032001\" type=\"event\" level=\"notice\" msg=\"Administrator admin logged in successfully\"",
+      "expect": {
+        "format": "rfc3164",
+        "facility": "local7",
+        "severity": 5,
+        "hostname": null,
+        "app": null,
+        "text": "date=2026-11-15 time=12:00:04 devname=\"FW-01\" logid=\"0100032001\" type=\"event\" level=\"notice\" msg=\"Administrator admin logged in successfully\""
+      }
+    },
+    {
+      "sender": "Malformed: no PRI at all (RFC 3164 §4.3.3 defaults)",
+      "raw": "hello from a misconfigured script\n",
+      "expect": {
+        "format": "rfc3164",
+        "facility": "user",
+        "severity": 5,
+        "hostname": null,
+        "app": null,
+        "text": "hello from a misconfigured script"
+      }
+    },
+    {
+      "sender": "Malformed: PRI out of range, control characters",
+      "raw": "<999>weird\u0007 line\twith tab",
+      "expect": {
+        "format": "rfc3164",
+        "facility": "user",
+        "severity": 5,
+        "text": "<999>weird line with tab"
+      }
+    }
+  ]
+}
