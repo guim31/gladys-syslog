@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-15
+
 ### Added
 
 - Syslog receiver over UDP and TCP (RFC 3164, RFC 5424, octet counting and
@@ -24,3 +26,6 @@ the notes of the version's GitHub Release.
 - Dashboard widget of the last severe messages, with a Clear button.
 - "Forget the senders not added" action.
 - English, French, German and Spanish.
+
+[Unreleased]: https://github.com/guim31/gladys-syslog/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/guim31/gladys-syslog/releases/tag/v1.0.0
