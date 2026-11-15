@@ -31,16 +31,25 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+index.js                          main container: SDK wiring only, src/app.js registers the handlers
+src/app.js                        every SDK handler -> the hub (also used by the tests)
+src/hub.js                        senders, rules, states (budgeted), scene events, receiver link status
+src/devices.js                    one device per sender + the rules device: features, names, ids
+src/rules.js                      rule compilation (text or /regex/) and matching
+src/link.js                       main side of the private link to the receiver (NDJSON over TCP)
+src/receiver.js                   the receiver: UDP/TCP syslog, allowed senders, rate limits, buffer
+src/receiver-main.js              entry point of the `receiver` sub-container (manifest `containers`)
+src/syslog/parse.js               RFC 3164 / RFC 5424 parsing, severities
+src/syslog/framing.js             RFC 6587 TCP framing (octet counting, LF/NUL)
+src/syslog/limits.js              allowed senders (IPv4 CIDR, IPv6), token buckets
+src/widgets.js                    dashboard widget `severe_messages` (manifest `widgets`)
+src/texts.js                      connection, severity and action texts (4 languages), dates
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+src/store.js, src/problems.js     /data/syslog-sources.json; one log line per repeated failure
+gladys-assistant-integration.json manifest: name, containers, config_schema, actions...
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (en and fr mandatory)
+test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing);
+                                  test/receiver.test.js uses real sockets on the loopback interface
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,8 +79,10 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in English, French, German and Spanish: action
+  messages, widget content, feature names, scene variables, manifest texts, and
+  `docs/en.md`, `docs/fr.md`, `docs/de.md`, `docs/es.md`, kept in sync
+  (`test/i18n.test.js` checks the languages and the doc sections).
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -214,6 +225,37 @@ code de ce dépôt. Compléter ce fichier quand un nouveau piège est découvert
 - Les filtres de scène ne font qu'égalité et appartenance : un seuil reste le travail d'un capteur.
 - **Les clés de widgets, de déclencheurs et d'actions sont figées une fois publiées.**
 - `gladys_version` `>=5.1.0` dès qu'il y a widgets, déclencheurs ou actions de scène.
+
+## Syslog (propre à ce dépôt)
+
+- **Le conteneur principal d'une intégration n'a aucun port publié** (`ExposedPorts`/`PortBindings` vides,
+  `container-descriptor.md`) : seuls les **sous-conteneurs** (`containers` du manifeste) en ont, au plus 3, et
+  **le port hôte est choisi par Gladys** (libre, persistant, lié à `0.0.0.0`), jamais déclaré. D'où le
+  sous-conteneur `receiver`, **même image** (`command: ["node", "src/receiver-main.js"]`), ports 5514 UDP et
+  TCP (deux entrées : deux ports hôtes différents). Le port 514 est donc impossible : relais rsyslog documenté.
+  Le principal rejoint le récepteur par l'alias DNS `receiver` sur le réseau privé `gladys-int-<selector>`, port
+  5515 jamais publié. `release.mjs` et `build.yml` font suivre l'image d'un sous-conteneur qui porte celle de
+  l'intégration (test `release.test.js` adapté : 3 lignes changées).
+- Le texte d'une `section` affiche les ports par `{{port:syslog_udp}}` / `{{port:syslog_tcp}}` (nom du port du
+  manifeste) et l'hôte par `{{gladys_host}}` ; laissés bruts tant que le sous-conteneur n'a jamais démarré.
+  `gladys_version >=5.2.0` par prudence (clone partiel du cœur : tag exact non vérifiable).
+- Un sous-conteneur a `RestartPolicy: no` et aucun jeton : s'il meurt, le principal le relance
+  (`gladys.startContainer('receiver')`, au plus toutes les 5 min, après 3 échecs de connexion).
+- **IP source** : Docker publie par DNAT (iptables) et garde l'adresse de l'émetteur du réseau local ; un envoi
+  depuis la machine Gladys elle-même passe par la passerelle du pont (ou docker-proxy) et arrive avec cette
+  adresse. Une redirection 514 → port choisi par iptables `REDIRECT` court-circuite le DNAT de Docker : d'où
+  les **relais de confiance** (identifiant `host:<nom d'hôte>`, `external_id` `…:source:host-<nom>`, jamais
+  confondu avec une IP).
+- Appareil d'un émetteur identifié par l'IP (`192-0-2-10`), nommé par le nom d'hôte du message. Rien des messages
+  n'est écrit sur `/data` ; seulement la liste des émetteurs (`/data/syslog-sources.json`).
+- Budgets : états toutes les 15 s, seulement les changements (dédoublonnage maison + heartbeat 12 h), 60 au plus
+  par tour (300/min au cœur) ; événements de scène : recharge de 10 s par (règle, émetteur) ou (émetteur,
+  sévérité), 120/min. Récepteur : 20 msg/s par émetteur (rafale ×2, réglable), 500 msg/s au total, trames TCP de
+  8 Ko, 64 connexions TCP, tampon de 500 messages, 200 émetteurs.
+- La réponse d'une action (`onAction`) est l'objet `{ en, fr, de, es }` lui-même : le SDK l'enveloppe dans
+  `{ message }` (le renvoyer déjà enveloppé donne `message.message`).
+- Allemand : le test de politesse attrape aussi un « Sie » en début de phrase qui veut dire « ils » : tourner
+  autrement (« Deren Meldungen… », « Diese… »).
 
 ## Store
 

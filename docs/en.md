@@ -1,61 +1,217 @@
-# Demo Devices Template
+# Syslog
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+Your router, NAS, UPS, switches and servers all write logs, and almost all of
+them can send these logs over the network with **syslog**. This integration
+makes Gladys a syslog receiver: each device that sends its logs becomes a Gladys
+device with its last message, its last severity and its errors of the last
+hour. Rules pick the messages that matter ("VPN connection", "disk failure",
+"power cut"…) and trigger scenes, and a dashboard widget lists the last severe
+messages.
 
-## What you get
+Nothing is stored: Gladys keeps the last message of each device and the last
+severe messages in memory, and counters. It is not a log archive (for that, see
+Graylog).
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+Tested with real syslog senders (`logger`, rsyslog 8 as a relay, RFC 3164 and
+RFC 5424, UDP and TCP) against the Docker image of the integration; not yet on a
+real Gladys instance: feedback welcome on
+[the issues](https://github.com/guim31/gladys-syslog/issues).
+
+## What you need
+
+- Gladys Assistant 5.2.0 or later.
+- Devices that can send their logs to a "remote syslog server", over UDP or TCP,
+  with a configurable port. Most routers, NAS (Synology, QNAP, TrueNAS…), UPS
+  software (NUT, apcupsd), switches, firewalls and Linux servers (rsyslog,
+  syslog-ng, journald) can.
+
+## Getting started
+
+### 1. Install the integration
+
+In Gladys, **Integrations → Install from GitHub**, address
+`https://github.com/guim31/gladys-syslog`. The integration starts two
+containers: the integration itself and a small **receiver** that listens for
+syslog. Gladys chooses the ports the receiver is reachable on, one for UDP and
+one for TCP: the configuration screen of the integration shows them, in the
+"Send your logs to Gladys" section.
+
+### 2. Point your devices at Gladys
+
+In the syslog (or "remote logging") settings of each device, enter the address
+of the Gladys machine and the UDP port shown by the configuration screen. UDP is
+what almost every device offers; TCP (the second port) does not lose messages
+and suits rsyslog and syslog-ng. Both "octet counting" and "one message per
+line" TCP framings are understood.
+
+On a Linux server with rsyslog, one line in `/etc/rsyslog.d/gladys.conf` is
+enough (replace the address and the port):
+
+```
+*.* @192.168.1.10:41234
+```
+
+`@` sends over UDP, `@@` over TCP. To test from any Linux machine:
+
+```
+logger -n 192.168.1.10 -P 41234 --udp "Hello Gladys"
+```
+
+### 3. A device that only sends to port 514
+
+Some boxes do not let you choose the port: they always send to port 514. Two
+solutions:
+
+- **A relay** (recommended): an rsyslog that listens on port 514, on a machine
+  of the network (a NAS, a Raspberry Pi…), and forwards everything to Gladys:
+
+  ```
+  module(load="imudp")
+  input(type="imudp" port="514")
+  *.* action(type="omfwd" target="192.168.1.10" port="41234" protocol="udp"
+             template="RSYSLOG_SyslogProtocol23Format")
+  ```
+
+  Then enter the IP address of the relay in **Trusted relays**: the messages it
+  forwards are sorted by the host name they carry, so each device behind the
+  relay stays a device of its own. (Without this, they would all look like the
+  relay.) A relay on the Gladys machine itself reaches the receiver through
+  Docker, under another address: the IP parameter of the devices it forwarded
+  before you declared it shows which one.
+
+- **A port redirection** on the Gladys machine (iptables), from 514 to the
+  chosen port. It hides the sender's address from the integration on most Docker
+  setups: prefer the relay.
+
+### 4. Add the devices
+
+Each device that sends a message appears in the **Discovery** tab of the
+integration, named after the host name it sends (or its IP address). Add the
+ones you want to follow. The integration identifies a device by its IP address:
+give your devices a fixed address (a DHCP reservation).
+
+The **Forget the senders not added** button of the configuration clears the
+Discovery tab of the devices you did not add; they come back with their next
+message.
 
 ## Configuration
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+- **Allowed senders**: IP addresses or IPv4 ranges (`192.168.1.0/24`),
+  separated by commas. Empty: every sender is accepted. A message from another
+  address is dropped by the receiver.
+- **Trusted relays**: see above.
+- **Messages per second per sender** (20 by default): beyond, the messages of
+  that sender are dropped (a burst of twice this number is accepted). A device
+  gone wild cannot flood Gladys. The receiver also accepts 500 messages a second
+  at most, all senders together.
+- **Language of the names and texts**: the names of the features (fixed when a
+  device is added), the severities and the scene variables.
+- **Rules**: up to five, see below.
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+## Severities
 
-## Actions
+Each syslog message carries a severity, from the most to the least severe:
+Emergency, Alert, Critical, Error, Warning, Notice, Info, Debug. A message
+without one counts as Notice. The integration calls "severe" a message Warning
+or more severe, and "error" a message Error or more severe.
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+## The devices
 
-## Scenes
+Each sender:
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+- **Last message**: the program and the text of its last message.
+- **Last severity**: the severity of its last message.
+- **Errors in the last hour**: its messages Error or more severe in the last 60
+  minutes.
+- **Last seen**: the time of its last message.
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+The **Syslog rules** device has one counter per rule, named after the rule: the
+messages that matched it in the last 60 minutes. Use them in scene conditions
+("more than 5 failed logins in the last hour").
+
+The states are sent to Gladys every 15 seconds at most, only when they change:
+Gladys accepts 300 states a minute.
+
+## Rules
+
+A rule has:
+
+- a **name**, the name of its counter and a variable of its scene trigger;
+- a **text**, found in the message whatever the case, or a **regular
+  expression** between slashes: `/disk \S+ failed/i` (`i`: whatever the case).
+  The message is read as `program: text`, so a rule can name the program:
+  `openvpn: .* Peer Connection Initiated`;
+- a minimum **severity** (Any by default);
+- optional **senders**: IP addresses or host names, separated by commas.
+
+Examples: `Peer Connection Initiated` (OpenVPN connection), `on battery` (NUT,
+power cut), `authentication failure` (failed login), `/ata\d.*failed/`
+(disk error in the kernel log).
 
 ## Dashboard
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+The **Severe log messages** widget shows:
+
+- the errors of the last hour, all senders together;
+- the last severe messages, newest first: the text, the sender and the time,
+  the severity as a colored badge; tap a message to read it whole;
+- a **Clear** button: once read, the list only shows the new messages.
+
+Settings: the senders (empty: all), the minimum severity shown (Error by
+default), and switches to hide the counter and the Clear button. The severe
+messages are kept in memory only: a restart of the integration empties the
+list.
+
+## Scenes
+
+### Triggers
+
+- **A rule matches**: a message matches a rule. Filters: the rules, the
+  senders. Variables: rule name, sender, IP address, severity, program,
+  message.
+- **A severe message arrives**: a sender logs a Warning or worse. Filters: the
+  severities, the senders. Same variables, without the rule.
+- **A new sender appears**: a device never seen before sends its first message
+  (a new device on the network, or one misconfigured). Variables: sender, IP
+  address.
+
+To avoid floods, a trigger fires at most once every 10 seconds for the same
+rule and sender (or the same sender and severity), and the integration sends
+120 scene events a minute at most.
+
+### Scene ideas
+
+- "Power cut": rule `on battery` → send a message and turn off what can be.
+- "Someone logged into the VPN": rule `Peer Connection Initiated` → a
+  notification with `{{triggerEvent.data.message}}`.
+- "The NAS reports a disk error": the "A severe message arrives" trigger,
+  severities Critical and Error, sender the NAS.
 
 ## Troubleshooting
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+- **No device appears**: check that the device sends to the right port (the one
+  of the configuration screen, not 514) and to the IP address of the Gladys
+  machine; test with `logger` from a computer. Check the Allowed senders.
+- **The configuration screen shows `{{port:syslog_udp}}`**: the receiver has not
+  started yet; reload the page a few seconds after the installation.
+- **Every device has the same address**: they go through a relay, or Gladys
+  runs Docker with a network setup that hides the sender's address. Use Trusted
+  relays.
+- **Messages are missing**: a sender over its rate limit is reported in the
+  integration logs; raise "Messages per second per sender". UDP can lose
+  messages on a busy network: use TCP.
+- **The status is red**: the receiver container is not running (the
+  integration starts it again by itself), a regular expression of a rule is
+  invalid, or an allowed sender is not understood: the message says which.
+
+## Limits
+
+- The time of a message is the time it is received: device clocks are often
+  wrong, and the old syslog format has neither year nor time zone.
+- A device is identified by its IP address: a device whose address changes
+  appears again in Discovery.
+- No TLS (syslog over TLS, port 6514): the receiver is meant for the local
+  network.
+- 200 senders at most; messages are cut at 2,048 characters.
+- Nothing is archived: for searching old logs, use a log server (Graylog…).
+- Not affiliated with any of the brands cited.

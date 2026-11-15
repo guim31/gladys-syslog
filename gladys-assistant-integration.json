@@ -1,177 +1,1320 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Syslog",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Your router, NAS and servers send their logs to Gladys: react to the messages that matter.",
+    "fr": "Box, NAS et serveurs envoient leurs journaux à Gladys : réagissez aux messages qui comptent.",
+    "de": "Router, NAS und Server schicken ihre Protokolle an Gladys: Reagiere auf wichtige Meldungen.",
+    "es": "Router, NAS y servidores envían sus registros a Gladys: reaccione a los mensajes importantes."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
-  "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "docker_image": "ghcr.io/guim31/gladys-syslog:1.0.0",
+  "gladys_version": ">=5.2.0",
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-syslog/main/cover.png",
+  "categories": ["servers", "network"],
+  "transports": ["local"],
+  "containers": [
+    {
+      "name": "receiver",
+      "docker_image": "ghcr.io/guim31/gladys-syslog:1.0.0",
+      "start": "auto",
+      "command": ["node", "src/receiver-main.js"],
+      "memory_mb": 128,
+      "cpu": 0.5,
+      "ports": [
+        {
+          "container_port": 5514,
+          "protocol": "udp",
+          "name": "syslog_udp",
+          "browsable": false,
+          "label": {
+            "en": "Syslog (UDP)",
+            "fr": "Syslog (UDP)",
+            "de": "Syslog (UDP)",
+            "es": "Syslog (UDP)"
+          }
+        },
+        {
+          "container_port": 5514,
+          "protocol": "tcp",
+          "name": "syslog_tcp",
+          "browsable": false,
+          "label": {
+            "en": "Syslog (TCP)",
+            "fr": "Syslog (TCP)",
+            "de": "Syslog (TCP)",
+            "es": "Syslog (TCP)"
+          }
+        }
+      ]
+    }
+  ],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Send your logs to Gladys",
+        "fr": "Envoyez vos journaux à Gladys",
+        "de": "Schicke deine Protokolle an Gladys",
+        "es": "Envíe sus registros a Gladys"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "In the syslog settings of your router, NAS, UPS or server, set the remote server to {{gladys_host}}, UDP port {{port:syslog_udp}} (or TCP port {{port:syslog_tcp}}). Gladys chooses these ports: a device that only sends to port 514 needs a redirection, see the guide. Each sender then appears in the Discovery tab.",
+        "fr": "Dans les réglages syslog de votre box, NAS, onduleur ou serveur, indiquez le serveur distant {{gladys_host}}, port UDP {{port:syslog_udp}} (ou port TCP {{port:syslog_tcp}}). Ces ports sont choisis par Gladys : un appareil qui n'envoie que vers le port 514 demande une redirection, voir le guide. Chaque émetteur apparaît ensuite dans l'onglet Découverte.",
+        "de": "Trage in den Syslog-Einstellungen deines Routers, NAS, deiner USV oder deines Servers den entfernten Server {{gladys_host}} ein, UDP-Port {{port:syslog_udp}} (oder TCP-Port {{port:syslog_tcp}}). Gladys wählt diese Ports: Ein Gerät, das nur an Port 514 sendet, braucht eine Umleitung, siehe Anleitung. Jeder Absender erscheint dann im Tab „Entdecken“.",
+        "es": "En los ajustes syslog de su router, NAS, SAI o servidor, indique el servidor remoto {{gladys_host}}, puerto UDP {{port:syslog_udp}} (o puerto TCP {{port:syslog_tcp}}). Gladys elige estos puertos: un equipo que solo envía al puerto 514 necesita una redirección, vea la guía. Cada emisor aparece luego en la pestaña Descubrir."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://github.com/guim31/gladys-syslog/blob/main/docs/en.md",
+          "label": {
+            "en": "Setup guide",
+            "fr": "Guide d'installation",
+            "de": "Einrichtungsanleitung",
+            "es": "Guía de instalación"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
-    },
-    {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
-      "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "key": "allowed_sources",
+      "type": "string",
       "required": false,
-      "default": "celsius",
+      "default": "",
+      "label": {
+        "en": "Allowed senders (optional)",
+        "fr": "Émetteurs autorisés (facultatif)",
+        "de": "Erlaubte Absender (optional)",
+        "es": "Emisores permitidos (opcional)"
+      },
+      "description": {
+        "en": "IP addresses or IPv4 ranges, separated by commas. Empty: every sender is accepted.",
+        "fr": "Adresses IP ou plages IPv4, séparées par des virgules. Vide : tout émetteur est accepté.",
+        "de": "IP-Adressen oder IPv4-Bereiche, durch Kommas getrennt. Leer: Jeder Absender wird angenommen.",
+        "es": "Direcciones IP o rangos IPv4, separados por comas. Vacío: se acepta cualquier emisor."
+      },
+      "placeholder": {
+        "en": "e.g. 192.168.1.1, 192.168.10.0/24",
+        "fr": "ex. 192.168.1.1, 192.168.10.0/24",
+        "de": "z. B. 192.168.1.1, 192.168.10.0/24",
+        "es": "p. ej. 192.168.1.1, 192.168.10.0/24"
+      }
+    },
+    {
+      "key": "relays",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Trusted relays (optional)",
+        "fr": "Relais de confiance (facultatif)",
+        "de": "Vertrauenswürdige Relays (optional)",
+        "es": "Relés de confianza (opcional)"
+      },
+      "description": {
+        "en": "IP of a syslog relay (rsyslog…) forwarding other devices: their messages are sorted by the host name they carry, not by the relay IP.",
+        "fr": "IP d'un relais syslog (rsyslog…) qui transmet d'autres appareils : leurs messages sont classés par le nom d'hôte qu'ils portent, pas par l'IP du relais.",
+        "de": "IP eines Syslog-Relays (rsyslog…), das andere Geräte weiterleitet: Deren Meldungen werden nach ihrem Hostnamen sortiert, nicht nach der IP des Relays.",
+        "es": "IP de un relé syslog (rsyslog…) que reenvía otros equipos: sus mensajes se clasifican por el nombre de host que llevan, no por la IP del relé."
+      },
+      "placeholder": {
+        "en": "e.g. 192.168.1.2",
+        "fr": "ex. 192.168.1.2",
+        "de": "z. B. 192.168.1.2",
+        "es": "p. ej. 192.168.1.2"
+      }
+    },
+    {
+      "key": "rate_limit",
+      "type": "number",
+      "required": false,
+      "default": 20,
+      "min": 1,
+      "max": 500,
+      "label": {
+        "en": "Messages per second per sender",
+        "fr": "Messages par seconde par émetteur",
+        "de": "Meldungen pro Sekunde je Absender",
+        "es": "Mensajes por segundo por emisor"
+      },
+      "description": {
+        "en": "Beyond, the messages of that sender are dropped: a device gone wild cannot flood Gladys.",
+        "fr": "Au-delà, les messages de cet émetteur sont ignorés : un appareil qui s'emballe ne peut pas saturer Gladys.",
+        "de": "Darüber werden die Meldungen dieses Absenders verworfen: Ein durchdrehendes Gerät kann Gladys nicht überfluten.",
+        "es": "Por encima, los mensajes de ese emisor se descartan: un equipo desbocado no puede saturar Gladys."
+      }
+    },
+    {
+      "key": "language",
+      "type": "select",
+      "required": false,
+      "default": "fr",
+      "label": {
+        "en": "Language of the names and texts",
+        "fr": "Langue des noms et des textes",
+        "de": "Sprache der Namen und Texte",
+        "es": "Idioma de los nombres y textos"
+      },
+      "description": {
+        "en": "Used for the feature names (fixed when a device is added), the severities and the scene variables.",
+        "fr": "Pour les noms des fonctionnalités (figés à l'ajout d'un appareil), les sévérités et les variables de scène.",
+        "de": "Für die Namen der Funktionen (beim Hinzufügen eines Geräts festgelegt), die Schweregrade und die Szenenvariablen.",
+        "es": "Para los nombres de las funciones (fijados al añadir un dispositivo), las gravedades y las variables de escena."
+      },
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
-      "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+      "key": "rules_intro",
+      "type": "section",
+      "label": {
+        "en": "Rules",
+        "fr": "Règles",
+        "de": "Regeln",
+        "es": "Reglas"
       },
+      "description": {
+        "en": "Up to five rules. A rule counts the messages that contain its text (any case), or match a regular expression written between slashes (/disk .* failed/i), at least as severe as chosen, from the chosen senders (IP or host name, empty: all). Each rule has a counter in the \"Syslog rules\" device and fires the \"A rule matches\" scene trigger.",
+        "fr": "Jusqu'à cinq règles. Une règle compte les messages qui contiennent son texte (sans tenir compte de la casse), ou qui correspondent à une expression régulière écrite entre barres obliques (/disk .* failed/i), au moins aussi graves que choisi, venant des émetteurs choisis (IP ou nom d'hôte, vide : tous). Chaque règle a un compteur dans l'appareil « Règles syslog » et déclenche le déclencheur de scène « Une règle correspond ».",
+        "de": "Bis zu fünf Regeln. Eine Regel zählt die Meldungen, die ihren Text enthalten (ohne Groß-/Kleinschreibung), oder die einem regulären Ausdruck zwischen Schrägstrichen entsprechen (/disk .* failed/i), mindestens so schwer wie gewählt, von den gewählten Absendern (IP oder Hostname, leer: alle). Jede Regel hat einen Zähler im Gerät „Syslog-Regeln“ und löst den Szenenauslöser „Eine Regel trifft zu“ aus.",
+        "es": "Hasta cinco reglas. Una regla cuenta los mensajes que contienen su texto (sin distinguir mayúsculas), o que corresponden a una expresión regular escrita entre barras (/disk .* failed/i), al menos tan graves como lo elegido, de los emisores elegidos (IP o nombre de host, vacío: todos). Cada regla tiene un contador en el dispositivo «Reglas syslog» y activa el disparador de escena «Una regla coincide»."
+      }
+    },
+    {
+      "key": "rule_1_name",
+      "type": "string",
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": "",
+      "label": {
+        "en": "Rule 1: name",
+        "fr": "Règle 1 : nom",
+        "de": "Regel 1: Name",
+        "es": "Regla 1: nombre"
+      },
+      "placeholder": {
+        "en": "e.g. VPN connection",
+        "fr": "ex. Connexion VPN",
+        "de": "z. B. VPN-Verbindung",
+        "es": "p. ej. Conexión VPN"
+      }
+    },
+    {
+      "key": "rule_1_pattern",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 1: text or /regular expression/",
+        "fr": "Règle 1 : texte ou /expression régulière/",
+        "de": "Regel 1: Text oder /regulärer Ausdruck/",
+        "es": "Regla 1: texto o /expresión regular/"
+      },
+      "placeholder": {
+        "en": "e.g. openvpn: .* connected",
+        "fr": "ex. openvpn: .* connected",
+        "de": "z. B. openvpn: .* connected",
+        "es": "p. ej. openvpn: .* connected"
+      }
+    },
+    {
+      "key": "rule_1_severity",
+      "type": "select",
+      "required": false,
+      "default": "any",
+      "label": {
+        "en": "Rule 1: at least this severe",
+        "fr": "Règle 1 : au moins aussi grave que",
+        "de": "Regel 1: mindestens so schwer wie",
+        "es": "Regla 1: al menos tan grave como"
+      },
+      "options": [
+        {
+          "value": "any",
+          "label": {
+            "en": "Any",
+            "fr": "Toutes",
+            "de": "Alle",
+            "es": "Cualquiera"
+          }
+        },
+        {
+          "value": "notice",
+          "label": {
+            "en": "Notice",
+            "fr": "Notification",
+            "de": "Hinweis",
+            "es": "Aviso"
+          }
+        },
+        {
+          "value": "warning",
+          "label": {
+            "en": "Warning",
+            "fr": "Avertissement",
+            "de": "Warnung",
+            "es": "Advertencia"
+          }
+        },
+        {
+          "value": "err",
+          "label": {
+            "en": "Error",
+            "fr": "Erreur",
+            "de": "Fehler",
+            "es": "Error"
+          }
+        },
+        {
+          "value": "crit",
+          "label": {
+            "en": "Critical",
+            "fr": "Critique",
+            "de": "Kritisch",
+            "es": "Crítico"
+          }
+        },
+        {
+          "value": "alert",
+          "label": {
+            "en": "Alert",
+            "fr": "Alerte",
+            "de": "Alarm",
+            "es": "Alerta"
+          }
+        },
+        {
+          "value": "emerg",
+          "label": {
+            "en": "Emergency",
+            "fr": "Urgence",
+            "de": "Notfall",
+            "es": "Emergencia"
+          }
+        }
+      ]
+    },
+    {
+      "key": "rule_1_sources",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 1: senders (optional)",
+        "fr": "Règle 1 : émetteurs (facultatif)",
+        "de": "Regel 1: Absender (optional)",
+        "es": "Regla 1: emisores (opcional)"
+      },
+      "placeholder": {
+        "en": "IP or host names, empty: all",
+        "fr": "IP ou noms d'hôte, vide : tous",
+        "de": "IP oder Hostnamen, leer: alle",
+        "es": "IP o nombres de host, vacío: todos"
+      }
+    },
+    {
+      "key": "rule_2_name",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 2: name",
+        "fr": "Règle 2 : nom",
+        "de": "Regel 2: Name",
+        "es": "Regla 2: nombre"
+      },
+      "placeholder": {
+        "en": "e.g. Disk failure",
+        "fr": "ex. Disque en erreur",
+        "de": "z. B. Festplattenfehler",
+        "es": "p. ej. Fallo de disco"
+      }
+    },
+    {
+      "key": "rule_2_pattern",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 2: text or /regular expression/",
+        "fr": "Règle 2 : texte ou /expression régulière/",
+        "de": "Regel 2: Text oder /regulärer Ausdruck/",
+        "es": "Regla 2: texto o /expresión regular/"
+      },
+      "placeholder": {
+        "en": "e.g. /(disk|sata|ata\\d).*(fail|error)/i",
+        "fr": "ex. /(disk|sata|ata\\d).*(fail|error)/i",
+        "de": "z. B. /(disk|sata|ata\\d).*(fail|error)/i",
+        "es": "p. ej. /(disk|sata|ata\\d).*(fail|error)/i"
+      }
+    },
+    {
+      "key": "rule_2_severity",
+      "type": "select",
+      "required": false,
+      "default": "any",
+      "label": {
+        "en": "Rule 2: at least this severe",
+        "fr": "Règle 2 : au moins aussi grave que",
+        "de": "Regel 2: mindestens so schwer wie",
+        "es": "Regla 2: al menos tan grave como"
+      },
+      "options": [
+        {
+          "value": "any",
+          "label": {
+            "en": "Any",
+            "fr": "Toutes",
+            "de": "Alle",
+            "es": "Cualquiera"
+          }
+        },
+        {
+          "value": "notice",
+          "label": {
+            "en": "Notice",
+            "fr": "Notification",
+            "de": "Hinweis",
+            "es": "Aviso"
+          }
+        },
+        {
+          "value": "warning",
+          "label": {
+            "en": "Warning",
+            "fr": "Avertissement",
+            "de": "Warnung",
+            "es": "Advertencia"
+          }
+        },
+        {
+          "value": "err",
+          "label": {
+            "en": "Error",
+            "fr": "Erreur",
+            "de": "Fehler",
+            "es": "Error"
+          }
+        },
+        {
+          "value": "crit",
+          "label": {
+            "en": "Critical",
+            "fr": "Critique",
+            "de": "Kritisch",
+            "es": "Crítico"
+          }
+        },
+        {
+          "value": "alert",
+          "label": {
+            "en": "Alert",
+            "fr": "Alerte",
+            "de": "Alarm",
+            "es": "Alerta"
+          }
+        },
+        {
+          "value": "emerg",
+          "label": {
+            "en": "Emergency",
+            "fr": "Urgence",
+            "de": "Notfall",
+            "es": "Emergencia"
+          }
+        }
+      ]
+    },
+    {
+      "key": "rule_2_sources",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 2: senders (optional)",
+        "fr": "Règle 2 : émetteurs (facultatif)",
+        "de": "Regel 2: Absender (optional)",
+        "es": "Regla 2: emisores (opcional)"
+      },
+      "placeholder": {
+        "en": "IP or host names, empty: all",
+        "fr": "IP ou noms d'hôte, vide : tous",
+        "de": "IP oder Hostnamen, leer: alle",
+        "es": "IP o nombres de host, vacío: todos"
+      }
+    },
+    {
+      "key": "rule_3_name",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 3: name",
+        "fr": "Règle 3 : nom",
+        "de": "Regel 3: Name",
+        "es": "Regla 3: nombre"
+      },
+      "placeholder": {
+        "en": "e.g. Power cut",
+        "fr": "ex. Coupure secteur",
+        "de": "z. B. Stromausfall",
+        "es": "p. ej. Corte de luz"
+      }
+    },
+    {
+      "key": "rule_3_pattern",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 3: text or /regular expression/",
+        "fr": "Règle 3 : texte ou /expression régulière/",
+        "de": "Regel 3: Text oder /regulärer Ausdruck/",
+        "es": "Regla 3: texto o /expresión regular/"
+      },
+      "placeholder": {
+        "en": "e.g. on battery",
+        "fr": "ex. on battery",
+        "de": "z. B. on battery",
+        "es": "p. ej. on battery"
+      }
+    },
+    {
+      "key": "rule_3_severity",
+      "type": "select",
+      "required": false,
+      "default": "any",
+      "label": {
+        "en": "Rule 3: at least this severe",
+        "fr": "Règle 3 : au moins aussi grave que",
+        "de": "Regel 3: mindestens so schwer wie",
+        "es": "Regla 3: al menos tan grave como"
+      },
+      "options": [
+        {
+          "value": "any",
+          "label": {
+            "en": "Any",
+            "fr": "Toutes",
+            "de": "Alle",
+            "es": "Cualquiera"
+          }
+        },
+        {
+          "value": "notice",
+          "label": {
+            "en": "Notice",
+            "fr": "Notification",
+            "de": "Hinweis",
+            "es": "Aviso"
+          }
+        },
+        {
+          "value": "warning",
+          "label": {
+            "en": "Warning",
+            "fr": "Avertissement",
+            "de": "Warnung",
+            "es": "Advertencia"
+          }
+        },
+        {
+          "value": "err",
+          "label": {
+            "en": "Error",
+            "fr": "Erreur",
+            "de": "Fehler",
+            "es": "Error"
+          }
+        },
+        {
+          "value": "crit",
+          "label": {
+            "en": "Critical",
+            "fr": "Critique",
+            "de": "Kritisch",
+            "es": "Crítico"
+          }
+        },
+        {
+          "value": "alert",
+          "label": {
+            "en": "Alert",
+            "fr": "Alerte",
+            "de": "Alarm",
+            "es": "Alerta"
+          }
+        },
+        {
+          "value": "emerg",
+          "label": {
+            "en": "Emergency",
+            "fr": "Urgence",
+            "de": "Notfall",
+            "es": "Emergencia"
+          }
+        }
+      ]
+    },
+    {
+      "key": "rule_3_sources",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 3: senders (optional)",
+        "fr": "Règle 3 : émetteurs (facultatif)",
+        "de": "Regel 3: Absender (optional)",
+        "es": "Regla 3: emisores (opcional)"
+      },
+      "placeholder": {
+        "en": "IP or host names, empty: all",
+        "fr": "IP ou noms d'hôte, vide : tous",
+        "de": "IP oder Hostnamen, leer: alle",
+        "es": "IP o nombres de host, vacío: todos"
+      }
+    },
+    {
+      "key": "rule_4_name",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 4: name",
+        "fr": "Règle 4 : nom",
+        "de": "Regel 4: Name",
+        "es": "Regla 4: nombre"
+      },
+      "placeholder": {
+        "en": "e.g. Failed login",
+        "fr": "ex. Échec de connexion",
+        "de": "z. B. Fehlgeschlagene Anmeldung",
+        "es": "p. ej. Inicio de sesión fallido"
+      }
+    },
+    {
+      "key": "rule_4_pattern",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 4: text or /regular expression/",
+        "fr": "Règle 4 : texte ou /expression régulière/",
+        "de": "Regel 4: Text oder /regulärer Ausdruck/",
+        "es": "Regla 4: texto o /expresión regular/"
+      },
+      "placeholder": {
+        "en": "e.g. authentication failure",
+        "fr": "ex. authentication failure",
+        "de": "z. B. authentication failure",
+        "es": "p. ej. authentication failure"
+      }
+    },
+    {
+      "key": "rule_4_severity",
+      "type": "select",
+      "required": false,
+      "default": "any",
+      "label": {
+        "en": "Rule 4: at least this severe",
+        "fr": "Règle 4 : au moins aussi grave que",
+        "de": "Regel 4: mindestens so schwer wie",
+        "es": "Regla 4: al menos tan grave como"
+      },
+      "options": [
+        {
+          "value": "any",
+          "label": {
+            "en": "Any",
+            "fr": "Toutes",
+            "de": "Alle",
+            "es": "Cualquiera"
+          }
+        },
+        {
+          "value": "notice",
+          "label": {
+            "en": "Notice",
+            "fr": "Notification",
+            "de": "Hinweis",
+            "es": "Aviso"
+          }
+        },
+        {
+          "value": "warning",
+          "label": {
+            "en": "Warning",
+            "fr": "Avertissement",
+            "de": "Warnung",
+            "es": "Advertencia"
+          }
+        },
+        {
+          "value": "err",
+          "label": {
+            "en": "Error",
+            "fr": "Erreur",
+            "de": "Fehler",
+            "es": "Error"
+          }
+        },
+        {
+          "value": "crit",
+          "label": {
+            "en": "Critical",
+            "fr": "Critique",
+            "de": "Kritisch",
+            "es": "Crítico"
+          }
+        },
+        {
+          "value": "alert",
+          "label": {
+            "en": "Alert",
+            "fr": "Alerte",
+            "de": "Alarm",
+            "es": "Alerta"
+          }
+        },
+        {
+          "value": "emerg",
+          "label": {
+            "en": "Emergency",
+            "fr": "Urgence",
+            "de": "Notfall",
+            "es": "Emergencia"
+          }
+        }
+      ]
+    },
+    {
+      "key": "rule_4_sources",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 4: senders (optional)",
+        "fr": "Règle 4 : émetteurs (facultatif)",
+        "de": "Regel 4: Absender (optional)",
+        "es": "Regla 4: emisores (opcional)"
+      },
+      "placeholder": {
+        "en": "IP or host names, empty: all",
+        "fr": "IP ou noms d'hôte, vide : tous",
+        "de": "IP oder Hostnamen, leer: alle",
+        "es": "IP o nombres de host, vacío: todos"
+      }
+    },
+    {
+      "key": "rule_5_name",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 5: name",
+        "fr": "Règle 5 : nom",
+        "de": "Regel 5: Name",
+        "es": "Regla 5: nombre"
+      },
+      "placeholder": {
+        "en": "e.g. Backup done",
+        "fr": "ex. Sauvegarde terminée",
+        "de": "z. B. Sicherung fertig",
+        "es": "p. ej. Copia terminada"
+      }
+    },
+    {
+      "key": "rule_5_pattern",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 5: text or /regular expression/",
+        "fr": "Règle 5 : texte ou /expression régulière/",
+        "de": "Regel 5: Text oder /regulärer Ausdruck/",
+        "es": "Regla 5: texto o /expresión regular/"
+      },
+      "placeholder": {
+        "en": "e.g. backup completed",
+        "fr": "ex. backup completed",
+        "de": "z. B. backup completed",
+        "es": "p. ej. backup completed"
+      }
+    },
+    {
+      "key": "rule_5_severity",
+      "type": "select",
+      "required": false,
+      "default": "any",
+      "label": {
+        "en": "Rule 5: at least this severe",
+        "fr": "Règle 5 : au moins aussi grave que",
+        "de": "Regel 5: mindestens so schwer wie",
+        "es": "Regla 5: al menos tan grave como"
+      },
+      "options": [
+        {
+          "value": "any",
+          "label": {
+            "en": "Any",
+            "fr": "Toutes",
+            "de": "Alle",
+            "es": "Cualquiera"
+          }
+        },
+        {
+          "value": "notice",
+          "label": {
+            "en": "Notice",
+            "fr": "Notification",
+            "de": "Hinweis",
+            "es": "Aviso"
+          }
+        },
+        {
+          "value": "warning",
+          "label": {
+            "en": "Warning",
+            "fr": "Avertissement",
+            "de": "Warnung",
+            "es": "Advertencia"
+          }
+        },
+        {
+          "value": "err",
+          "label": {
+            "en": "Error",
+            "fr": "Erreur",
+            "de": "Fehler",
+            "es": "Error"
+          }
+        },
+        {
+          "value": "crit",
+          "label": {
+            "en": "Critical",
+            "fr": "Critique",
+            "de": "Kritisch",
+            "es": "Crítico"
+          }
+        },
+        {
+          "value": "alert",
+          "label": {
+            "en": "Alert",
+            "fr": "Alerte",
+            "de": "Alarm",
+            "es": "Alerta"
+          }
+        },
+        {
+          "value": "emerg",
+          "label": {
+            "en": "Emergency",
+            "fr": "Urgence",
+            "de": "Notfall",
+            "es": "Emergencia"
+          }
+        }
+      ]
+    },
+    {
+      "key": "rule_5_sources",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "label": {
+        "en": "Rule 5: senders (optional)",
+        "fr": "Règle 5 : émetteurs (facultatif)",
+        "de": "Regel 5: Absender (optional)",
+        "es": "Regla 5: emisores (opcional)"
+      },
+      "placeholder": {
+        "en": "IP or host names, empty: all",
+        "fr": "IP ou noms d'hôte, vide : tous",
+        "de": "IP oder Hostnamen, leer: alle",
+        "es": "IP o nombres de host, vacío: todos"
+      }
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
+      "key": "forget_senders",
+      "label": {
+        "en": "Forget the senders not added",
+        "fr": "Oublier les émetteurs non ajoutés",
+        "de": "Nicht hinzugefügte Absender vergessen",
+        "es": "Olvidar los emisores no añadidos"
+      },
+      "description": {
+        "en": "Clears the Discovery tab of the senders you did not add to Gladys. They come back with their next message.",
+        "fr": "Vide l'onglet Découverte des émetteurs que vous n'avez pas ajoutés à Gladys. Ils reviennent avec leur prochain message.",
+        "de": "Leert den Tab „Entdecken“ von den Absendern, die du nicht zu Gladys hinzugefügt hast. Mit ihrer nächsten Meldung kommen sie zurück.",
+        "es": "Vacía la pestaña Descubrir de los emisores que no añadió a Gladys. Vuelven con su próximo mensaje."
+      }
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "rule_matched",
+      "label": {
+        "en": "A rule matches",
+        "fr": "Une règle correspond",
+        "de": "Eine Regel trifft zu",
+        "es": "Una regla coincide"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "A message matches one of the rules of the configuration (at most once every 10 s per rule and sender).",
+        "fr": "Un message correspond à l'une des règles de la configuration (au plus une fois toutes les 10 s par règle et émetteur).",
+        "de": "Eine Meldung trifft auf eine der Regeln der Konfiguration zu (höchstens alle 10 s je Regel und Absender).",
+        "es": "Un mensaje coincide con una de las reglas de la configuración (como mucho cada 10 s por regla y emisor)."
       },
       "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+          "key": "rule",
+          "type": "multi_select",
+          "label": {
+            "en": "Rules (empty: any)",
+            "fr": "Règles (vide : toutes)",
+            "de": "Regeln (leer: alle)",
+            "es": "Reglas (vacío: todas)"
+          },
+          "options": [
+            {
+              "value": "rule_1",
+              "label": {
+                "en": "Rule 1",
+                "fr": "Règle 1",
+                "de": "Regel 1",
+                "es": "Regla 1"
+              }
+            },
+            {
+              "value": "rule_2",
+              "label": {
+                "en": "Rule 2",
+                "fr": "Règle 2",
+                "de": "Regel 2",
+                "es": "Regla 2"
+              }
+            },
+            {
+              "value": "rule_3",
+              "label": {
+                "en": "Rule 3",
+                "fr": "Règle 3",
+                "de": "Regel 3",
+                "es": "Regla 3"
+              }
+            },
+            {
+              "value": "rule_4",
+              "label": {
+                "en": "Rule 4",
+                "fr": "Règle 4",
+                "de": "Regel 4",
+                "es": "Regla 4"
+              }
+            },
+            {
+              "value": "rule_5",
+              "label": {
+                "en": "Rule 5",
+                "fr": "Règle 5",
+                "de": "Regel 5",
+                "es": "Regla 5"
+              }
+            }
+          ]
         },
         {
-          "key": "target",
+          "key": "device",
           "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
+          "source": "devices",
+          "label": {
+            "en": "Senders (empty: any)",
+            "fr": "Émetteurs (vide : tous)",
+            "de": "Absender (leer: alle)",
+            "es": "Emisores (vacío: todos)"
+          }
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "rule_name",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Rule name",
+            "fr": "Nom de la règle",
+            "de": "Name der Regel",
+            "es": "Nombre de la regla"
+          }
+        },
+        {
+          "key": "source",
+          "type": "string",
+          "label": {
+            "en": "Sender",
+            "fr": "Émetteur",
+            "de": "Absender",
+            "es": "Emisor"
+          }
+        },
+        {
+          "key": "ip",
+          "type": "string",
+          "label": {
+            "en": "IP address",
+            "fr": "Adresse IP",
+            "de": "IP-Adresse",
+            "es": "Dirección IP"
+          }
+        },
+        {
+          "key": "severity_label",
+          "type": "string",
+          "label": {
+            "en": "Severity",
+            "fr": "Sévérité",
+            "de": "Schweregrad",
+            "es": "Gravedad"
+          }
+        },
+        {
+          "key": "app",
+          "type": "string",
+          "label": {
+            "en": "Program",
+            "fr": "Programme",
+            "de": "Programm",
+            "es": "Programa"
+          }
+        },
+        {
+          "key": "message",
+          "type": "string",
+          "label": {
+            "en": "Message",
+            "fr": "Message",
+            "de": "Meldung",
+            "es": "Mensaje"
+          }
         }
       ]
-    }
-  ],
-  "scene_actions": [
+    },
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "severe_message",
+      "label": {
+        "en": "A severe message arrives",
+        "fr": "Un message grave arrive",
+        "de": "Eine schwere Meldung kommt an",
+        "es": "Llega un mensaje grave"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "A sender logs a warning or worse (at most once every 10 s per sender and severity).",
+        "fr": "Un émetteur journalise un avertissement ou plus grave (au plus une fois toutes les 10 s par émetteur et sévérité).",
+        "de": "Ein Absender protokolliert eine Warnung oder Schlimmeres (höchstens alle 10 s je Absender und Schweregrad).",
+        "es": "Un emisor registra una advertencia o algo más grave (como mucho cada 10 s por emisor y gravedad)."
+      },
       "fields": [
         {
+          "key": "severity",
+          "type": "multi_select",
+          "label": {
+            "en": "Severities (empty: any)",
+            "fr": "Sévérités (vide : toutes)",
+            "de": "Schweregrade (leer: alle)",
+            "es": "Gravedades (vacío: todas)"
+          },
+          "options": [
+            {
+              "value": "emerg",
+              "label": {
+                "en": "Emergency",
+                "fr": "Urgence",
+                "de": "Notfall",
+                "es": "Emergencia"
+              }
+            },
+            {
+              "value": "alert",
+              "label": {
+                "en": "Alert",
+                "fr": "Alerte",
+                "de": "Alarm",
+                "es": "Alerta"
+              }
+            },
+            {
+              "value": "crit",
+              "label": {
+                "en": "Critical",
+                "fr": "Critique",
+                "de": "Kritisch",
+                "es": "Crítico"
+              }
+            },
+            {
+              "value": "err",
+              "label": {
+                "en": "Error",
+                "fr": "Erreur",
+                "de": "Fehler",
+                "es": "Error"
+              }
+            },
+            {
+              "value": "warning",
+              "label": {
+                "en": "Warning",
+                "fr": "Avertissement",
+                "de": "Warnung",
+                "es": "Advertencia"
+              }
+            }
+          ]
+        },
+        {
           "key": "device",
-          "type": "select",
+          "type": "multi_select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "label": {
+            "en": "Senders (empty: any)",
+            "fr": "Émetteurs (vide : tous)",
+            "de": "Absender (leer: alle)",
+            "es": "Emisores (vacío: todos)"
+          }
         }
       ],
-      "outputs": [
+      "variables": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "source",
+          "type": "string",
+          "label": {
+            "en": "Sender",
+            "fr": "Émetteur",
+            "de": "Absender",
+            "es": "Emisor"
+          }
+        },
+        {
+          "key": "ip",
+          "type": "string",
+          "label": {
+            "en": "IP address",
+            "fr": "Adresse IP",
+            "de": "IP-Adresse",
+            "es": "Dirección IP"
+          }
+        },
+        {
+          "key": "severity_label",
+          "type": "string",
+          "label": {
+            "en": "Severity",
+            "fr": "Sévérité",
+            "de": "Schweregrad",
+            "es": "Gravedad"
+          }
+        },
+        {
+          "key": "app",
+          "type": "string",
+          "label": {
+            "en": "Program",
+            "fr": "Programme",
+            "de": "Programm",
+            "es": "Programa"
+          }
+        },
+        {
+          "key": "message",
+          "type": "string",
+          "label": {
+            "en": "Message",
+            "fr": "Message",
+            "de": "Meldung",
+            "es": "Mensaje"
+          }
+        }
+      ]
+    },
+    {
+      "key": "new_source",
+      "label": {
+        "en": "A new sender appears",
+        "fr": "Un nouvel émetteur apparaît",
+        "de": "Ein neuer Absender erscheint",
+        "es": "Aparece un nuevo emisor"
+      },
+      "description": {
+        "en": "A device never seen before sends its first message: a new device on the network, or a misconfigured one.",
+        "fr": "Un appareil jamais vu envoie son premier message : un nouvel appareil sur le réseau, ou un appareil mal réglé.",
+        "de": "Ein nie gesehenes Gerät sendet seine erste Meldung: ein neues Gerät im Netzwerk oder ein falsch eingestelltes.",
+        "es": "Un equipo nunca visto envía su primer mensaje: un equipo nuevo en la red, o uno mal configurado."
+      },
+      "variables": [
+        {
+          "key": "source",
+          "type": "string",
+          "label": {
+            "en": "Sender",
+            "fr": "Émetteur",
+            "de": "Absender",
+            "es": "Emisor"
+          }
+        },
+        {
+          "key": "ip",
+          "type": "string",
+          "label": {
+            "en": "IP address",
+            "fr": "Adresse IP",
+            "de": "IP-Adresse",
+            "es": "Dirección IP"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "severe_messages",
+      "label": {
+        "en": "Severe log messages",
+        "fr": "Messages graves",
+        "de": "Schwere Meldungen",
+        "es": "Mensajes graves"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "The last severe messages of your devices, newest first, and the errors of the last hour.",
+        "fr": "Derniers messages graves de vos appareils, les plus récents d'abord, et les erreurs de l'heure.",
+        "de": "Die letzten schweren Meldungen deiner Geräte, die neuesten zuerst, und die Fehler der Stunde.",
+        "es": "Los últimos mensajes graves de sus equipos, los más recientes primero, y los errores de la hora."
+      },
+      "icon": "alert-triangle",
+      "settings": [
+        {
+          "key": "sources",
+          "type": "multi_select",
+          "source": "devices",
+          "required": false,
+          "label": {
+            "en": "Senders (empty: all)",
+            "fr": "Émetteurs (vide : tous)",
+            "de": "Absender (leer: alle)",
+            "es": "Emisores (vacío: todos)"
+          },
+          "description": {
+            "en": "Only the devices added to Gladys can be chosen.",
+            "fr": "Seuls les appareils ajoutés à Gladys peuvent être choisis.",
+            "de": "Nur die in Gladys angelegten Geräte sind wählbar.",
+            "es": "Solo se pueden elegir los dispositivos añadidos a Gladys."
+          }
+        },
+        {
+          "key": "min_severity",
+          "type": "select",
+          "required": false,
+          "default": "err",
+          "label": {
+            "en": "Show from",
+            "fr": "Afficher à partir de",
+            "de": "Anzeigen ab",
+            "es": "Mostrar a partir de"
+          },
+          "options": [
+            {
+              "value": "warning",
+              "label": {
+                "en": "Warning",
+                "fr": "Avertissement",
+                "de": "Warnung",
+                "es": "Advertencia"
+              }
+            },
+            {
+              "value": "err",
+              "label": {
+                "en": "Error",
+                "fr": "Erreur",
+                "de": "Fehler",
+                "es": "Error"
+              }
+            },
+            {
+              "value": "crit",
+              "label": {
+                "en": "Critical",
+                "fr": "Critique",
+                "de": "Kritisch",
+                "es": "Crítico"
+              }
+            }
+          ]
+        },
+        {
+          "key": "show_count",
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "label": {
+            "en": "Show the errors of the last hour",
+            "fr": "Afficher les erreurs de l'heure",
+            "de": "Fehler der letzten Stunde anzeigen",
+            "es": "Mostrar los errores de la última hora"
+          }
+        },
+        {
+          "key": "show_clear",
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "label": {
+            "en": "Show the Clear button",
+            "fr": "Afficher le bouton Effacer",
+            "de": "Schaltfläche Leeren anzeigen",
+            "es": "Mostrar el botón Borrar"
+          }
+        }
+      ]
     }
   ]
 }
